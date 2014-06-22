@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Speedometer</string>
+    <string name="action_settings">Settings</string>
+    <string name="speed_value">0</string>
+    <string name="speed_unit">m/s</string>
+    <string name="sensor_accuracy">Sensor Accuracy: </string>
+    <string name="reser_button">Reset</string>
+    <string name="time">Time: </string>
+    <string name="calibrate_button">Calibrate</string>
+    <string name="calibration_const">Calibration const: </string>
+    <string name="distance_value">0</string>
+    <string name="m">m</string>
+    <string name="distance_title">Distance: </string>
+
+</resources>
