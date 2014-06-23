@@ -20,6 +20,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 import bresiu.speedometer.logs.Array;
+import bresiu.speedometer.logs.DeltaZArray;
+import bresiu.speedometer.logs.DeltaZPoint;
+import bresiu.speedometer.logs.NewArray;
 import bresiu.speedometer.logs.NewPoint;
 import bresiu.speedometer.logs.Point;
 
@@ -28,7 +31,8 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
 
     private static final int SENSOR_RATE = SensorManager.SENSOR_DELAY_FASTEST;
     private static final double N2S = 1000000000.0d;
-    private static final float gError = 0.004f;
+    private static final float GERROR = 0.004f;
+    private static final float DELTA_ERROR = 2.0f;
 
     private Vibrator vibrator;
 
@@ -46,6 +50,11 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
     private long dt = 0l;
     private double distance = 0.0;
     private boolean isCalibrating = false;
+    private boolean mInitialized = false;
+    private int stepsCount = 0;
+    private double mLastX;
+    private double mLastY;
+    private double mLastZ;
 
     private int mYScale = 5;
 
@@ -53,7 +62,10 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
     private double calibratingValue = 0.0;
 
     private Array array;
+    private NewArray newArray;
+    private DeltaZArray deltaZArray;
 
+    private TextView mStepCount;
     private TextView mSpeedValue;
     private TextView mDistanceValue;
     private TextView mSensorAccuracy;
@@ -85,7 +97,6 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
         if (mLinearAccSensor != null) {
             mSensorManager.registerListener(this, mLinearAccSensor, SENSOR_RATE);
         }
-
     }
 
     @Override
@@ -108,6 +119,7 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
         Button mResetButton = (Button) findViewById(R.id.reset_button);
         Button mPlus = (Button) findViewById(R.id.plus_button);
         Button mMinus = (Button) findViewById(R.id.minus_button);
+        mStepCount = (TextView) findViewById(R.id.step_count);
         mYScaleValue = (TextView) findViewById(R.id.acc_value);
         mCalibrate = (Button) findViewById(R.id.calibrate_button);
         mSpeedValue = (TextView) findViewById(R.id.speed_value);
@@ -148,42 +160,112 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
             calibratingValue = 0.0;
             mCalibrate.setText("Calibrate");
             array.saveLogs(array.returnArray());
+            newArray.saveLogs(newArray.returnArray());
+            deltaZArray.saveLogs(deltaZArray.returnArray());
         } else {
             array = new Array();
+            newArray = new NewArray();
+            deltaZArray = new DeltaZArray();
             isCalibrating = true;
             mCalibrate.setText("Stop Calibrating");
         }
     }
 
     private void calculateSpeed(SensorEvent event) {
-        if (mStartTimestamp != 0l) {
-            double a = event.values[1];
-            if (event.values[2] > mYScale) {
-                vibrator.vibrate(500);
-            }
-            dt = event.timestamp - mStartTimestamp;
-            DateTime date = new DateTime();
-            mStartTimestamp = event.timestamp;
-            mSpeed += a * (dt / N2S);
-            if (mSpeed >= 0) {
-                updateSpeed(mSpeed);
-                double distance = calculateDistance(mSpeed, dt / N2S);
-                if (isCalibrating) {
-                    addValues(a);
-                    Point point = new Point(date.get(DateTimeFieldType.millisOfDay()),
-                            event.values[0], event.values[1],
-                            event.values[2], mSpeed, distance);
-                    float vector = Math.sqrt(event.values[0])
-                    NewPoint newPoint = new NewPoint(date.get(DateTimeFieldType.millisOfDay()), )
-                    array.insertPoint(point);
-                }
+        DateTime date = new DateTime();
+        if (true) {
+// event object contains values of acceleration, read those
+            double x = event.values[0];
+            double y = event.values[1];
+            double z = event.values[2];
+
+            final double alpha = 0.8; // constant for our filter below
+
+            /*
+            double[] gravity = {0, 0, 0};
+
+            // Isolate the force of gravity with the low-pass filter.
+            gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0];
+            gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1];
+            gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2];
+
+            // Remove the gravity contribution with the high-pass filter.
+            x = event.values[0] - gravity[0];
+            y = event.values[1] - gravity[1];
+            z = event.values[2] - gravity[2];
+            */
+
+            if (!mInitialized) {
+                // sensor is used for the first time, initialize the last read values
+                mLastX = x;
+                mLastY = y;
+                mLastZ = z;
+                mInitialized = true;
             } else {
-                mSpeed = 0.0;
-                mSpeedValue.setText("0.0");
+                // sensor is already initialized, and we have previously read values.
+                // take difference of past and current values and decide which
+                // axis acceleration was detected by comparing values
+                double deltaX = Math.abs(mLastX - x);
+                double deltaY = Math.abs(mLastY - y);
+                double deltaZ = Math.abs(mLastZ - z);
+                if (deltaX < DELTA_ERROR)
+                    deltaX = (float) 0.0;
+                if (deltaY < DELTA_ERROR)
+                    deltaY = (float) 0.0;
+                if (deltaZ < DELTA_ERROR)
+                    deltaZ = (float) 0.0;
+                mLastX = x;
+                mLastY = y;
+                mLastZ = z;
+
+                //if (deltaX > deltaY) {
+                // Horizontal shake
+                // do something here if you like
+                //} else if (deltaY > deltaX) {
+                // Vertical shake
+                // do something here if you like
+
+                //} else if ((deltaZ > deltaX) && (deltaZ > deltaY)) {
+                // Z shake
+                if (isCalibrating) {
+                    DeltaZPoint deltaZPoint = new DeltaZPoint(date.get(DateTimeFieldType
+                            .millisOfDay()), deltaX, deltaY, deltaZ);
+                    deltaZArray.insertPoint(deltaZPoint);
+                }
             }
-            calculateTimeFromStart(dt);
         } else {
-            mStartTimestamp = event.timestamp;
+
+            if (mStartTimestamp != 0l) {
+                double a = event.values[1];
+                if (event.values[2] > mYScale) {
+                    vibrator.vibrate(100);
+                }
+                dt = event.timestamp - mStartTimestamp;
+                mStartTimestamp = event.timestamp;
+                mSpeed += a * (dt / N2S);
+                if (mSpeed >= 0) {
+                    updateSpeed(mSpeed);
+                    double distance = calculateDistance(mSpeed, dt / N2S);
+                    if (isCalibrating) {
+                        addValues(a);
+                        Point point = new Point(date.get(DateTimeFieldType.millisOfDay()),
+                                event.values[0], event.values[1],
+                                event.values[2], mSpeed, distance);
+                        double vector = Math.sqrt(event.values[0] * 2 + event.values[1] * 2 + event
+                                .values[2] * 2);
+                        NewPoint newPoint = new NewPoint(date.get(DateTimeFieldType.millisOfDay()),
+                                vector);
+                        newArray.insertPoint(newPoint);
+                        array.insertPoint(point);
+                    }
+                } else {
+                    mSpeed = 0.0;
+                    mSpeedValue.setText("0.0");
+                }
+                calculateTimeFromStart(dt);
+            } else {
+                mStartTimestamp = event.timestamp;
+            }
         }
     }
 
@@ -273,6 +355,8 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
         mSpeed = 0;
         mSpeedValue.setText("0.0");
         distance = 0.0;
+        stepsCount = 0;
+        mStepCount.setText("0");
         mDistanceValue.setText("0");
         onResume();
     }

@@ -2,9 +2,9 @@ package bresiu.speedometer.logs;
 
 public class NewPoint {
     long timestamp;
-    float vector;
+    double vector;
 
-    public NewPoint(long timestamp, float vector) {
+    public NewPoint(long timestamp, double vector) {
         this.timestamp = timestamp;
         this.vector = vector;
     }

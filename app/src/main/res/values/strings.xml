@@ -16,5 +16,7 @@
     <string name="plus">+</string>
     <string name="minus">-</string>
     <string name="acc_scale_start">5</string>
+    <string name="step_count">0</string>
+    <string name="step_title">No steps: </string>
 
 </resources>
