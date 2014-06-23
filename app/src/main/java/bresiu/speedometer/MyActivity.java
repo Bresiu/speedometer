@@ -7,19 +7,30 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Bundle;
+import android.os.Vibrator;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeFieldType;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+
+import bresiu.speedometer.logs.Array;
+import bresiu.speedometer.logs.NewPoint;
+import bresiu.speedometer.logs.Point;
 
 
 public class MyActivity extends Activity implements SensorEventListener, View.OnClickListener {
 
     private static final int SENSOR_RATE = SensorManager.SENSOR_DELAY_FASTEST;
     private static final double N2S = 1000000000.0d;
+    private static final float gError = 0.004f;
+
+    private Vibrator vibrator;
 
     private SensorManager mSensorManager;
 
@@ -36,13 +47,18 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
     private double distance = 0.0;
     private boolean isCalibrating = false;
 
+    private int mYScale = 5;
+
     private int calibratingCycle = 0;
     private double calibratingValue = 0.0;
+
+    private Array array;
 
     private TextView mSpeedValue;
     private TextView mDistanceValue;
     private TextView mSensorAccuracy;
     private TextView mTimeValue;
+    private TextView mYScaleValue;
     private Button mCalibrate;
 
     @Override
@@ -80,6 +96,7 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
 
     private void initSensors() {
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
+        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
         mGyroSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
         mMagSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
@@ -89,12 +106,17 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
 
     private void initViews() {
         Button mResetButton = (Button) findViewById(R.id.reset_button);
+        Button mPlus = (Button) findViewById(R.id.plus_button);
+        Button mMinus = (Button) findViewById(R.id.minus_button);
+        mYScaleValue = (TextView) findViewById(R.id.acc_value);
         mCalibrate = (Button) findViewById(R.id.calibrate_button);
         mSpeedValue = (TextView) findViewById(R.id.speed_value);
         mDistanceValue = (TextView) findViewById(R.id.distance_value);
         mSensorAccuracy = (TextView) findViewById(R.id.sensor_accuracy_value);
         mTimeValue = (TextView) findViewById(R.id.time_value);
         mResetButton.setOnClickListener(this);
+        mPlus.setOnClickListener(this);
+        mMinus.setOnClickListener(this);
         mCalibrate.setOnClickListener(this);
     }
 
@@ -120,12 +142,14 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
     private void calibrate() {
         if (isCalibrating) {
             String toastText = (calibratingValue / calibratingCycle) + "";
-            Toast.makeText(this, toastText, Toast.LENGTH_LONG).show();
+            Toast.makeText(this, toastText + " in " + calibratingCycle, Toast.LENGTH_LONG).show();
             isCalibrating = false;
             calibratingCycle = 0;
             calibratingValue = 0.0;
             mCalibrate.setText("Calibrate");
+            array.saveLogs(array.returnArray());
         } else {
+            array = new Array();
             isCalibrating = true;
             mCalibrate.setText("Stop Calibrating");
         }
@@ -134,14 +158,24 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
     private void calculateSpeed(SensorEvent event) {
         if (mStartTimestamp != 0l) {
             double a = event.values[1];
+            if (event.values[2] > mYScale) {
+                vibrator.vibrate(500);
+            }
             dt = event.timestamp - mStartTimestamp;
+            DateTime date = new DateTime();
             mStartTimestamp = event.timestamp;
             mSpeed += a * (dt / N2S);
             if (mSpeed >= 0) {
                 updateSpeed(mSpeed);
-                calculateDistance(mSpeed, dt / N2S);
+                double distance = calculateDistance(mSpeed, dt / N2S);
                 if (isCalibrating) {
                     addValues(a);
+                    Point point = new Point(date.get(DateTimeFieldType.millisOfDay()),
+                            event.values[0], event.values[1],
+                            event.values[2], mSpeed, distance);
+                    float vector = Math.sqrt(event.values[0])
+                    NewPoint newPoint = new NewPoint(date.get(DateTimeFieldType.millisOfDay()), )
+                    array.insertPoint(point);
                 }
             } else {
                 mSpeed = 0.0;
@@ -158,9 +192,10 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
         calibratingValue += a;
     }
 
-    private void calculateDistance(double speed, double dt) {
+    private double calculateDistance(double speed, double dt) {
         distance += (speed * dt);
         mDistanceValue.setText(round(distance, 2) + "");
+        return distance;
     }
 
     private void updateSpeed(double currentSpeed) {
@@ -214,6 +249,18 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
                 break;
             case R.id.calibrate_button:
                 calibrate();
+                break;
+            case R.id.plus_button:
+                if (mYScale < 16) {
+                    mYScale++;
+                    mYScaleValue.setText(mYScale + "");
+                }
+                break;
+            case R.id.minus_button:
+                if (mYScale > 0) {
+                    mYScale--;
+                    mYScaleValue.setText(mYScale + "");
+                }
                 break;
         }
     }

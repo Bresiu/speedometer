@@ -133,4 +133,36 @@
         android:id="@+id/calibrate_button"
         android:layout_above="@+id/reset_button"
         android:layout_alignParentRight="true"/>
+
+    <Button
+        style="?android:attr/buttonStyleSmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/minus"
+        android:id="@+id/minus_button"
+        android:layout_above="@+id/calibrate_button"
+        android:layout_alignStart="@+id/calibrate_button"
+        android:layout_alignEnd="@+id/calibrate_button"/>
+
+    <Button
+        style="?android:attr/buttonStyleSmall"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/plus"
+        android:id="@+id/plus_button"
+        android:layout_above="@+id/acc_value"
+        android:layout_alignLeft="@+id/acc_value"
+        android:layout_alignRight="@+id/acc_value"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:id="@+id/acc_value"
+        android:text="@string/acc_scale_start"
+        android:gravity="center"
+        android:padding="6dp"
+        android:layout_above="@+id/minus_button"
+        android:layout_alignLeft="@+id/minus_button"
+        android:layout_alignRight="@+id/minus_button"/>
 </RelativeLayout>

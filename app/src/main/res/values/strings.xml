@@ -13,5 +13,8 @@
     <string name="distance_value">0</string>
     <string name="m">m</string>
     <string name="distance_title">Distance: </string>
+    <string name="plus">+</string>
+    <string name="minus">-</string>
+    <string name="acc_scale_start">5</string>
 
 </resources>
