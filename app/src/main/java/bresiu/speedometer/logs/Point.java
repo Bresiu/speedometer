@@ -1,25 +1,22 @@
 package bresiu.speedometer.logs;
 
 public class Point {
-    long timestamp;
-    float xAcc;
-    float yAcc;
-    float zAcc;
-    double ySpeed;
-    double yDistance;
+    int count;
+    double xAcc;
+    double yAcc;
+    double zAcc;
+    double vAcc;
 
-    public Point(long timestamp, float xAcc, float yAcc, float zAcc, double ySpeed,
-                    double yDistance) {
-        this.timestamp = timestamp;
+    public Point(int count, double xAcc, double yAcc, double zAcc, double vAcc) {
+        this.count = count;
         this.xAcc = xAcc;
         this.yAcc = yAcc;
         this.zAcc = zAcc;
-        this.ySpeed = ySpeed;
-        this.yDistance = yDistance;
+        this.vAcc = vAcc;
     }
 
     @Override
     public String toString() {
-        return timestamp + " " + xAcc + " " + yAcc + " " + zAcc + " " + ySpeed + " " + yDistance;
+        return count + " " + xAcc + " " + yAcc + " " + zAcc + " " + vAcc;
     }
 }

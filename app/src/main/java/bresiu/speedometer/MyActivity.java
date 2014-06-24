@@ -13,17 +13,12 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeFieldType;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 import bresiu.speedometer.logs.Array;
 import bresiu.speedometer.logs.DeltaZArray;
-import bresiu.speedometer.logs.DeltaZPoint;
 import bresiu.speedometer.logs.NewArray;
-import bresiu.speedometer.logs.NewPoint;
 import bresiu.speedometer.logs.Point;
 
 
@@ -50,11 +45,14 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
     private long dt = 0l;
     private double distance = 0.0;
     private boolean isCalibrating = false;
-    private boolean mInitialized = false;
-    private int stepsCount = 0;
-    private double mLastX;
-    private double mLastY;
-    private double mLastZ;
+    private int count = 0;
+    private int smoothCount = 0;
+    private long previousTimeStamp = 0l;
+
+    private double x;
+    private double y;
+    private double z;
+    private double v;
 
     private int mYScale = 5;
 
@@ -79,12 +77,15 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
         setContentView(R.layout.activity_my);
         initViews();
         initSensors();
+
+        array = new Array();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
 
+        /*
         if (mGyroSensor != null) {
             mSensorManager.registerListener(this, mGyroSensor, SENSOR_RATE);
         }
@@ -94,6 +95,7 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
         if (mAccSensor != null) {
             mSensorManager.registerListener(this, mAccSensor, SENSOR_RATE);
         }
+        */
         if (mLinearAccSensor != null) {
             mSensorManager.registerListener(this, mLinearAccSensor, SENSOR_RATE);
         }
@@ -109,9 +111,9 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
-        mGyroSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
-        mMagSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-        mAccSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        //mGyroSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        //mMagSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        //mAccSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         mLinearAccSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
     }
 
@@ -172,101 +174,80 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
     }
 
     private void calculateSpeed(SensorEvent event) {
-        DateTime date = new DateTime();
-        if (true) {
-// event object contains values of acceleration, read those
-            double x = event.values[0];
-            double y = event.values[1];
-            double z = event.values[2];
+        double accX = event.values[0];
+        double accY = event.values[1];
+        double accZ = event.values[2];
+        double accV = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2) + Math.pow(z, 2));
 
-            final double alpha = 0.8; // constant for our filter below
+        // Removing bias on each measurement High Pass Filter
+        if (accX < 2 && accX > -2) { accX = 0.0; }
+        if (accY < 2 && accY > -2) { accY = 0.0; }
+        if (accZ < 2 && accZ > -2) { accZ = 0.0; }
+        if (accV < 2 && accV > -2) { accV = 0.0; }
 
-            /*
-            double[] gravity = {0, 0, 0};
-
-            // Isolate the force of gravity with the low-pass filter.
-            gravity[0] = alpha * gravity[0] + (1 - alpha) * event.values[0];
-            gravity[1] = alpha * gravity[1] + (1 - alpha) * event.values[1];
-            gravity[2] = alpha * gravity[2] + (1 - alpha) * event.values[2];
-
-            // Remove the gravity contribution with the high-pass filter.
-            x = event.values[0] - gravity[0];
-            y = event.values[1] - gravity[1];
-            z = event.values[2] - gravity[2];
-            */
-
-            if (!mInitialized) {
-                // sensor is used for the first time, initialize the last read values
-                mLastX = x;
-                mLastY = y;
-                mLastZ = z;
-                mInitialized = true;
-            } else {
-                // sensor is already initialized, and we have previously read values.
-                // take difference of past and current values and decide which
-                // axis acceleration was detected by comparing values
-                double deltaX = Math.abs(mLastX - x);
-                double deltaY = Math.abs(mLastY - y);
-                double deltaZ = Math.abs(mLastZ - z);
-                if (deltaX < DELTA_ERROR)
-                    deltaX = (float) 0.0;
-                if (deltaY < DELTA_ERROR)
-                    deltaY = (float) 0.0;
-                if (deltaZ < DELTA_ERROR)
-                    deltaZ = (float) 0.0;
-                mLastX = x;
-                mLastY = y;
-                mLastZ = z;
-
-                //if (deltaX > deltaY) {
-                // Horizontal shake
-                // do something here if you like
-                //} else if (deltaY > deltaX) {
-                // Vertical shake
-                // do something here if you like
-
-                //} else if ((deltaZ > deltaX) && (deltaZ > deltaY)) {
-                // Z shake
-                if (isCalibrating) {
-                    DeltaZPoint deltaZPoint = new DeltaZPoint(date.get(DateTimeFieldType
-                            .millisOfDay()), deltaX, deltaY, deltaZ);
-                    deltaZArray.insertPoint(deltaZPoint);
-                }
-            }
+        // 5-point smoothing
+        if (smoothCount <= 5) {
+            x += accX;
+            y += accY;
+            z += accZ;
+            v += accV;
+            smoothCount++;
         } else {
+            x /= smoothCount;
+            y /= smoothCount;
+            z /= smoothCount;
+            v /= smoothCount;
+            smoothCount = 0;
 
-            if (mStartTimestamp != 0l) {
-                double a = event.values[1];
-                if (event.values[2] > mYScale) {
-                    vibrator.vibrate(100);
-                }
-                dt = event.timestamp - mStartTimestamp;
-                mStartTimestamp = event.timestamp;
-                mSpeed += a * (dt / N2S);
-                if (mSpeed >= 0) {
-                    updateSpeed(mSpeed);
-                    double distance = calculateDistance(mSpeed, dt / N2S);
-                    if (isCalibrating) {
-                        addValues(a);
-                        Point point = new Point(date.get(DateTimeFieldType.millisOfDay()),
-                                event.values[0], event.values[1],
-                                event.values[2], mSpeed, distance);
-                        double vector = Math.sqrt(event.values[0] * 2 + event.values[1] * 2 + event
-                                .values[2] * 2);
-                        NewPoint newPoint = new NewPoint(date.get(DateTimeFieldType.millisOfDay()),
-                                vector);
-                        newArray.insertPoint(newPoint);
-                        array.insertPoint(point);
-                    }
-                } else {
-                    mSpeed = 0.0;
-                    mSpeedValue.setText("0.0");
-                }
-                calculateTimeFromStart(dt);
-            } else {
-                mStartTimestamp = event.timestamp;
-            }
+            Point point = new Point(count, x, y, z, v);
+            array.insertPoint(point);
+
+            x = 0;
+            y = 0;
+            z = 0;
+            v = 0;
         }
+        count++;
+        mTimeValue.setText("" + count);
+        if (count == 5000) {
+            vibrator.vibrate(500);
+            array.saveLogs(array.returnArray());
+        }
+
+        /*
+        if (mStartTimestamp != 0l) {
+            double a = event.values[1];
+            if (event.values[2] > mYScale) {
+                vibrator.vibrate(100);
+            }
+            dt = event.timestamp - mStartTimestamp;
+            mStartTimestamp = event.timestamp;
+            mSpeed += a * (dt / N2S);
+            if (mSpeed >= 0) {
+                updateSpeed(mSpeed);
+                double distance = calculateDistance(mSpeed, dt / N2S);
+                if (isCalibrating) {
+                    addValues(a);
+                    Point point = new Point(date.get(DateTimeFieldType.millisOfDay()),
+                            event.values[0], event.values[1],
+                            event.values[2], mSpeed, distance);
+                    double vector = Math.sqrt(event.values[0] * 2 + event.values[1] * 2 + event
+                            .values[2] * 2);
+                    NewPoint newPoint = new NewPoint(date.get(DateTimeFieldType.millisOfDay()),
+                            vector);
+                    newArray.insertPoint(newPoint);
+                    array.insertPoint(point);
+                }
+            } else {
+                mSpeed = 0.0;
+                mSpeedValue.setText("0.0");
+            }
+            calculateTimeFromStart(dt);
+        } else {
+            mStartTimestamp = event.timestamp;
+        }
+        */
+
     }
 
     private void addValues(double a) {
@@ -355,7 +336,7 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
         mSpeed = 0;
         mSpeedValue.setText("0.0");
         distance = 0.0;
-        stepsCount = 0;
+        count = 0;
         mStepCount.setText("0");
         mDistanceValue.setText("0");
         onResume();
