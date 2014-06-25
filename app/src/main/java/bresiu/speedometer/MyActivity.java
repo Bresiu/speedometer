@@ -13,6 +13,8 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import org.joda.time.DateTime;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -45,14 +47,45 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
     private long dt = 0l;
     private double distance = 0.0;
     private boolean isCalibrating = false;
+
+    // PEDOMETER VARIABLES
+    // counter
     private int count = 0;
+    // variable using to smooth linear plot (5)
     private int smoothCount = 0;
-    private long previousTimeStamp = 0l;
+    // steps
+    private int steps;
+    // first smoothing
+    private boolean isFirstSmoothing = true;
+    // const for z, y acc
+    private final double STEP_CONST = 0.5;
+    // gap between picks on Y and Z counter
+    private static final int PICK_GAP = 30;
+    // gap between pick and bottom on Y = 30
+    private static final int PICK_BOTTOM_GAP = 30;
+    private boolean yPickArea = false;
+    private boolean yBottomArea = false;
+    private boolean zPickArea = false;
+
+    private int gapYZPickCounter = 0;
+    private int gapYPickBottomCounter = 0;
+
+    // true if distance between Y-Z pick is < 30
+    private boolean gapPickPick = false;
+    // true if distance between Y pick and Y bottom is < 30
+    private boolean gapPickBottom = false;
+    private static final int GAP_BETWEEN_CONDITIONS = 60;
+    private int gapConditionsCounter = 0;
 
     private double x;
     private double y;
     private double z;
     private double v;
+
+    private double preX;
+    private double preY;
+    private double preZ;
+    private double preV;
 
     private int mYScale = 5;
 
@@ -173,6 +206,24 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
         }
     }
 
+    public void checkForYPickCond(double preY, double y) {
+        if (preY > y) {
+            yPickArea = true;
+        }
+    }
+
+    public void checkForZPickCond(double preZ, double z) {
+        if (preZ > z) {
+            zPickArea = true;
+        }
+    }
+
+    public void checkForYBottomCond(double preY, double y) {
+        if ((y < -STEP_CONST) && (preY < y)) {
+            yBottomArea = true;
+        }
+    }
+
     private void calculateSpeed(SensorEvent event) {
         double accX = event.values[0];
         double accY = event.values[1];
@@ -196,11 +247,68 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
             x /= smoothCount;
             y /= smoothCount;
             z /= smoothCount;
+            z = Math.abs(z);
             v /= smoothCount;
             smoothCount = 0;
 
             Point point = new Point(count, x, y, z, v);
             array.insertPoint(point);
+
+            if (!isFirstSmoothing) {
+                if ((z > STEP_CONST || z < -STEP_CONST) || y > STEP_CONST) {
+                    checkForYPickCond(preY, y);
+                    checkForYBottomCond(preY, y);
+                    checkForZPickCond(preZ, z);
+
+                    if (yPickArea || zPickArea) {
+                        if (gapPickPick) {
+                            gapYZPickCounter++;
+                        }
+                        if (yPickArea && zPickArea) {
+                            gapPickPick = true;
+                        }
+                        if ((yPickArea && !zPickArea) || (!yPickArea && zPickArea)) {
+                            gapYZPickCounter++;
+                        }
+                        if (gapYZPickCounter > PICK_GAP) {
+                            yPickArea = false;
+                            zPickArea = false;
+                        }
+                    }
+                    if (yBottomArea || zPickArea) {
+                        if (gapPickBottom) {
+                            gapYPickBottomCounter++;
+                        }
+                        if (yBottomArea && zPickArea) {
+                            gapPickBottom = true;
+                        }
+                        if ((yBottomArea && !zPickArea) || (!yBottomArea && zPickArea)) {
+                            gapYPickBottomCounter++;
+                        }
+                        if (gapYPickBottomCounter > PICK_BOTTOM_GAP) {
+                            yPickArea = false;
+                            zPickArea = false;
+                        }
+                    }
+                    if (gapPickPick && gapPickBottom) {
+                        DateTime dateTime = new DateTime();
+                        steps++;
+                        mStepCount.setText(steps + "");
+                        resetPedometer();
+                    }
+                }
+
+                preX = x;
+                preY = y;
+                preZ = z;
+                preV = v;
+            } else {
+                isFirstSmoothing = false;
+                preX = x;
+                preY = y;
+                preZ = z;
+                preV = v;
+            }
 
             x = 0;
             y = 0;
@@ -247,6 +355,10 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
             mStartTimestamp = event.timestamp;
         }
         */
+
+    }
+
+    private void resetPedometer() {
 
     }
 
