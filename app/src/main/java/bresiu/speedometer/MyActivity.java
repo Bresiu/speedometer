@@ -13,8 +13,6 @@ import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.joda.time.DateTime;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
@@ -175,10 +173,8 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
                 calculateSpeed(event);
                 break;
             case Sensor.TYPE_GYROSCOPE:
-
                 break;
             case Sensor.TYPE_MAGNETIC_FIELD:
-
                 break;
             case Sensor.TYPE_ACCELEROMETER:
 
@@ -228,8 +224,9 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
         double accX = event.values[0];
         double accY = event.values[1];
         double accZ = event.values[2];
-        double accV = Math.sqrt(Math.pow(x, 2) + Math.pow(y, 2) + Math.pow(z, 2));
+        double accV = Math.sqrt(Math.pow(accX, 2) + Math.pow(accY, 2) + Math.pow(accZ, 2));
 
+        /*
         // Removing bias on each measurement High Pass Filter
         if (accX < 2 && accX > -2) { accX = 0.0; }
         if (accY < 2 && accY > -2) { accY = 0.0; }
@@ -292,6 +289,7 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
                     }
                     if (gapPickPick && gapPickBottom) {
                         DateTime dateTime = new DateTime();
+
                         steps++;
                         mStepCount.setText(steps + "");
                         resetPedometer();
@@ -315,10 +313,14 @@ public class MyActivity extends Activity implements SensorEventListener, View.On
             z = 0;
             v = 0;
         }
+        */
+        Point point = new Point(count, accX, accY, accZ, accV);
+        array.insertPoint(point);
+
         count++;
         mTimeValue.setText("" + count);
-        if (count == 5000) {
-            vibrator.vibrate(500);
+        if (count == 10000) {
+            vibrator.vibrate(1000);
             array.saveLogs(array.returnArray());
         }
 
